@@ -1,0 +1,41 @@
+<h1>H5与V8引擎测试页面</h1>
+
+<a href="javascript:void(0)" class="btn read" id="a1">v8测试</a
+><br /><br /><br />
+
+<body>
+  <div id="text"></div>
+  <br /><br /><br />
+  <div id="container"></div>
+</body>
+<!-- 在这里注入JSBridge，由webview拦截这个链接，然后替换成assets目录的xbridge.js文件-->
+<script src="https://www.baidu.com/xbridge.js"></script>
+<script>
+  document.getElementById("a1").addEventListener("click", function () {
+    window.XJSBridge.callNative("nativeMethod", { name: "test" }, (res) => {
+      console.log("res = " + JSON.stringify(res));
+      document.getElementById("text").innerHTML =
+        "<span>" + res.data + "</span>";
+    });
+  });
+
+  window.addEventListener("message", receiverMessage, false);
+
+  function receiverMessage(messageEvent) {
+    console.log("onmessage...", JSON.stringify(messageEvent.data));
+    if (messageEvent.data === "__init_port__") {
+      //在window上挂载port对象，将native发过来的h5Port引用保存起来
+      window.__my_port__ = messageEvent.ports[0];
+      //设置消息
+      window.__my_port__.onmessage = function (f) {
+        console.log("recv msg from v8...");
+        onChannelMessage(f.data);
+      };
+    }
+  }
+
+  function onChannelMessage(msg) {
+    const content = "msg from native:" + msg;
+    document.getElementById("text").innerHTML = "<span>" + content + "</span>";
+  }
+</script>

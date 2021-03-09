@@ -1,7 +1,7 @@
 *.iml
 .gradle
 .DS_Store
-/HookWebViewContainer/build
+/HookWebViewContainer/.gradle
 /HookWebViewContainer/captures
 /HookWebViewContainer/app/build
 /HookWebViewContainer/captures

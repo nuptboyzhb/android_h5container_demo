@@ -1,0 +1,313 @@
+<h1>H5 Bridge测试页面</h1>
+
+<a href="javascript:void(0)" class="btn read" id="a1">测试JS调用native</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a2">调用native注入的对象</a
+><br /><br /><br />
+<a href="xscheme://native_page?name=test_activity" class="btn read" id="a3"
+  >通过href的scheme调用native</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a4">调用jsonp拦截</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a5">调用js的http请求</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a6">设置Cookie</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a7">获取native的Cookie</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a8">下载apk</a
+><br /><br /><br />
+<a href="javascript:void(0)" class="btn read" id="a9">唤起口碑app</a
+><br /><br /><br />
+
+<a href="javascript:void(0)" class="btn read" id="a10">MessageChannel测试</a
+><br /><br /><br />
+
+<body>
+  <div id="text"></div>
+  <br /><br /><br />
+  <div id="container"></div>
+</body>
+<!-- 在这里注入JSBridge，由webview拦截这个链接，然后替换成assets目录的xbridge.js文件-->
+<script src="https://www.baidu.com/xbridge.js"></script>
+<script>
+  //改变背景色，供native调用
+  function changeColor(color) {
+    document.getElementById("a1").style.background = color;
+    return true;
+  }
+
+  document.getElementById("a1").addEventListener("click", function () {
+    window.XJSBridge.callNative("nativeMethod", { name: "test" }, (res) => {
+      console.log("res = " + JSON.stringify(res));
+      document.getElementById("text").innerHTML =
+        "<span>" + res.data + "</span>";
+    });
+  });
+
+  document.getElementById("a2").addEventListener("click", function () {
+    console.log("clicked....");
+    if (nativeLog) {
+      nativeLog.print("content from js");
+    }
+  });
+
+  document.getElementById("a4").addEventListener("click", function () {
+    console.log("clicked a3....");
+    jsonp({
+      url: "https://sug.so.360.cn/suggest",
+      data: {
+        word: "js",
+      },
+      success: function (obj) {
+        console.log("jsonp success:" + JSON.stringify(obj));
+      },
+      fail: function (msg) {
+        console.log("jsonp fail:" + msg);
+      },
+    });
+  });
+
+  document.getElementById("a5").addEventListener("click", function () {
+    console.log("clicked 5....");
+    xhttp({
+      url: "https://sug.so.360.cn/suggest",
+      data: {
+        word: "Java",
+      },
+      success: function (res) {},
+      fail: function (msg) {},
+      timeout: 10000,
+      type: "GET",
+      headers: {},
+    });
+  });
+
+  document.getElementById("a5").addEventListener("click", function () {
+    console.log("clicked 5....");
+    xhttp({
+      url: "https://sug.so.360.cn/suggest",
+      data: {
+        word: "Java",
+      },
+      success: function (res) {},
+      fail: function (msg) {},
+      timeout: 10000,
+      type: "GET",
+      headers: {},
+    });
+  });
+
+  document.getElementById("a6").addEventListener("click", function () {
+    console.log("clicked 6....");
+    setCookie("test_session", "457548349394394a7fc8", 24 * 1000);
+    window.XJSBridge.callNative("showCookie", { name: "test" }, (res) => {
+      console.log("res = " + JSON.stringify(res));
+      document.getElementById("text").innerHTML =
+        "<span>" + res.data + "</span>";
+    });
+  });
+
+  document.getElementById("a7").addEventListener("click", function () {
+    console.log("clicked 7....cookie = " + document.cookie);
+    document.getElementById("text").innerHTML =
+      "<span>" + document.cookie + "</span>";
+  });
+
+  document.getElementById("a8").addEventListener("click", function () {
+    const apkUrl =
+      "http://tfs.alipayobjects.com/L1/71/1000/and/koubei/client/koubei_pc.apk";
+    console.log("clicked 8....apk = " + apkUrl);
+    window.location.href = apkUrl;
+  });
+
+  document.getElementById("a9").addEventListener("click", function () {
+    const scheme = "koubei://platformapi/startApp?appId=20000001";
+    console.log("scheme = " + scheme);
+    window.location.href = scheme;
+  });
+
+  document.getElementById("a10").addEventListener("click", function () {
+    sendMessageToNative();
+  });
+
+  function sendMessageToNative() {
+    if (window.__my_port__) {
+      window.__my_port__.postMessage("h5 test message");
+    }
+  }
+
+  window.addEventListener("message", receiverMessage, false);
+
+  function receiverMessage(messageEvent) {
+    console.log("onmessage...", JSON.stringify(messageEvent.data));
+    if (messageEvent.data === "__init_port__") {
+      //在window上挂载port对象，将native发过来的h5Port引用保存起来
+      window.__my_port__ = messageEvent.ports[0];
+      //设置消息
+      window.__my_port__.onmessage = function (f) {
+        console.log("recv msg from native...");
+        onChannelMessage(f.data);
+      };
+    }
+  }
+
+  function onChannelMessage(msg) {
+    const content = "msg from native:" + msg;
+    document.getElementById("text").innerHTML = "<span>" + content + "</span>";
+  }
+
+  function setCookie(c_name, value, expiredays) {
+    var exdate = new Date();
+    exdate.setTime(Number(exdate) + expiredays);
+    document.cookie =
+      c_name +
+      "=" +
+      escape(value) +
+      (expiredays == null ? "" : ";expires=" + exdate.toGMTString());
+  }
+
+  /**
+   * req = {url:'',data:{},success:()=>{},fail:()=>{},timeout:10000}
+   */
+  var jsonpSeq = 0;
+  function jsonp(req) {
+    var callbackName = "jsonpcb" + ++jsonpSeq;
+    //定义一个处理Jsonp返回数据的回调函数
+    window[callbackName] = function (object) {
+      console.log("callback...");
+      release("success");
+      req.success(object);
+    };
+    var script = document.createElement("script");
+    //组合请求URL
+    script.src = req.url + "?callback=" + callbackName;
+    for (key in req.data) {
+      script.src += "&" + key + "=" + encodeURIComponent(req.data[key]);
+    }
+    console.log("src=" + script.src);
+    script.async = true;
+    //设置错误回调
+    script.onerror = function () {
+      release("error");
+      req.fail("error");
+    };
+
+    //设置超时时间
+    var timeout = req.timeout || 15000;
+    var timeoutid = setTimeout(function () {
+      release("timeout");
+      req.fail("timeout");
+    }, timeout);
+
+    //释放资源
+    function release(msg) {
+      console.log("release=" + msg);
+      //清除定时器
+      if (timeoutid) {
+        clearTimeout(timeoutid);
+      }
+      //清除节点中的脚本
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+      //清除回调
+      if (msg === "timeout") {
+        window[callbackName] = function () {
+          window[callbackName] = undefined;
+          try {
+            delete window[callbackName];
+          } catch (e) {}
+        };
+      } else {
+        window[callbackName] = undefined;
+        try {
+          delete window[callbackName];
+        } catch (e) {}
+      }
+    }
+
+    //将创建的新节点添加到BOM树上
+    document.getElementsByTagName("body")[0].appendChild(script);
+  }
+
+  /**
+   *
+   * @param {url,data,success,fail,timeout,type,headers} req
+   */
+  function xhttp(req) {
+    var xhr = new window.XMLHttpRequest();
+    var timeout = req.timeout || 15000;
+    var timeoutId = setTimeout(function () {
+      release("timeout");
+    }, timeout);
+
+    function release(msg) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (msg === "timeout") {
+        xhr.abort();
+      }
+    }
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState == 4) {
+        var status = xhr.status;
+        var result;
+        var headers;
+        if ((status >= 200 && status < 300) || status == 304) {
+          release("success");
+          result = xhr.responseText;
+          headers = xhr.getAllResponseHeaders || "";
+          console.log("result = " + result);
+          req.success(result);
+        } else {
+          release("fail");
+          req.fail("ERROR");
+        }
+      }
+    };
+
+    var curl = req.url + "?" + stringifyQS(req.data);
+    var senddata = stringifyQS(req.data);
+
+    var type = req.type || "GET";
+
+    xhr.open(type, curl, true);
+
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader(
+      "Access-Control-Allow-Origin",
+      "https://sug.so.360.cn"
+    );
+    //xhr.setRequestHeader('Access-Control-Allow-Credentials', 'true');
+
+    var headers = {} || req.headers;
+    for (var key in headers) {
+      xhr.setRequestHeader(key, headers[key]);
+    }
+
+    xhr.send(senddata);
+  }
+
+  function stringifyQS(qs) {
+    var str = [];
+    for (var key in qs) {
+      if (!!qs[key]) {
+        str.push(key + "=" + encodeURIComponent(qs[key]));
+      }
+    }
+
+    return str.join("&");
+  }
+
+  window.addEventListener(
+    "onerror",
+    function (e) {
+      console.log("window.onerror:" + e);
+    },
+    true
+  );
+</script>
