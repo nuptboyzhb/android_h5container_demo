@@ -1211,6 +1211,8 @@ public class RouterManager {
 
 多进程下，Application会初始化多次，我们需要排除**非必要的初始化**，以及合理安排APP主进程和H5进行的**分工**，然后通过**进程间通信**(比如AIDL)的方式解决主进程和子进程之间的通信问题。
 
+【注】：部分机型上，多进程引起的WebView的Crash，可以通过`WebView.setDataDirectorySuffix(suffix);`[解决](https://stackoverflow.com/questions/51843546/android-pie-9-0-webview-in-multi-process)；
+
 ### 17.使用MessageChannel通信
 
 - [MessageChannel](https://developer.mozilla.org/en-US/docs/Web/API/MessageChannel)
